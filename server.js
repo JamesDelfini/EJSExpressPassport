@@ -1,25 +1,51 @@
+if (process.env.NOD_ENV !== 'production') {
+    require('dotenv').config();
+}
+
 const express = require('express');
 const { render } = require('ejs');
 const bcrypt = require('bcrypt');
+const passport = require('passport');
+const flash = require('express-flash');
+const session = require('express-session');
+
 
 const app = express();
 
+const initializePassport = require('./passport-config');
+initializePassport(
+    passport,
+    email => users.find(user => user.email === email),
+    id => users.find(user => user.id === id)
+);
+
 const users = [];
+
 
 app.set('view-engine', 'ejs');
 app.use(express.urlencoded({ extended: false })) // Take forms and access them in req variable in POST HTTP Methods
+app.use(flash());
+app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false, // Resave it if nothing has changed
+    saveUninitialized: false // Save an empty value in the session
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.get('/', (req, res) => {
-    res.render('index.ejs', { name: 'Delfini' });
+    res.render('index.ejs', { name: req.user.name });
 });
 
 app.get('/login', (req, res) => {
     res.render('login.ejs');
 });
 
-app.post('/login', (req, res) => {
-
-});
+app.post('/login', passport.authenticate('local', {
+    successRedirect: '/',
+    failureRedirect: '/login',
+    failureFlash: true // Show Flash message if that is been setup at initializePassport variable
+}));
 
 app.get('/register', (req, res) => {
     res.render('register.ejs');
@@ -33,12 +59,14 @@ app.post('/register', async (req, res) => {
             name: req.body.name,
             email: req.body.email,
             password: hashedPassword
-        })
+        });
 
         res.redirect('/login');
     } catch {
         res.redirect('/register');
     }
+
+    console.log(users);
 });
 
 app.listen(5000, () => console.log('Server Running'));
